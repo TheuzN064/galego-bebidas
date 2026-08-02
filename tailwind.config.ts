@@ -10,22 +10,28 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#FF6B00',
-          dark: '#E65A00',
-          light: '#FF8533',
+          DEFAULT: '#84cc16',
+          dark: '#65a30d',
+          light: '#a3e635',
+          glow: '#bef264',
         },
         dark: {
-          bg: '#0A0A0A',
-          card: '#141414',
-          border: '#262626',
-          text: '#FAFAFA',
-          muted: '#A3A3A3',
+          bg: '#09090b',
+          card: '#121215',
+          'card-hover': '#18181d',
+          border: '#27272a',
+          text: '#f4f4f5',
+          muted: '#a1a1aa',
         },
       },
       fontFamily: {
         anton: ['var(--font-anton)'],
         manrope: ['var(--font-manrope)'],
         mono: ['var(--font-space-mono)'],
+      },
+      boxShadow: {
+        'lime-glow': '0 0 20px rgba(132, 204, 22, 0.35)',
+        'lime-glow-lg': '0 0 35px rgba(132, 204, 22, 0.45)',
       },
     },
   },

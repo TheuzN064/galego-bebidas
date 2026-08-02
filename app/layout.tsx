@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Anton, Manrope, Space_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -19,9 +19,17 @@ const spaceMono = Space_Mono({
   variable: '--font-space-mono',
 })
 
+export const viewport: Viewport = {
+  themeColor: '#84cc16',
+}
+
 export const metadata: Metadata = {
   title: 'Galego — Depósito de Bebidas',
-  description: 'Catálogo de bebidas com entrega rápida',
+  description: 'Catálogo de bebidas geladas com entrega rápida',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 }
 
 export default function RootLayout({

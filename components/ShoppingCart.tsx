@@ -41,11 +41,12 @@ export function ShoppingCart({
     return (
       <button
         onClick={onOpen}
-        className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-all hover:bg-primary-dark hover:scale-110"
+        className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-black shadow-[0_0_30px_rgba(132,204,22,0.4)] transition-all duration-300 hover:bg-primary-light hover:scale-110 active:scale-95"
+        aria-label="Ver carrinho"
       >
-        <ShoppingBag className="h-6 w-6" />
+        <ShoppingBag className="h-7 w-7 stroke-[2.2]" />
         {itemCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold">
+          <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black border-2 border-primary text-primary text-xs font-black shadow-md">
             {itemCount}
           </span>
         )}

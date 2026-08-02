@@ -81,40 +81,59 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg">
+    <div className="min-h-screen bg-dark-bg selection:bg-primary selection:text-black">
       {/* Header */}
-      <header className="border-b border-dark-border bg-dark-card">
-        <div className="container mx-auto px-4 py-4">
+      <header className="sticky top-0 z-30 border-b border-dark-border bg-dark-card/90 backdrop-blur-md">
+        <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-anton text-2xl text-primary">GALEGO</h1>
-              <p className="text-sm text-dark-muted">Painel Administrativo</p>
+            <div className="flex items-center gap-3">
+              <img 
+                src="/logo.png" 
+                alt="Galego" 
+                className="h-10 w-10 rounded-full object-cover ring-2 ring-primary shadow-lime-glow-sm"
+              />
+              <div>
+                <h1 className="font-anton text-xl tracking-wide text-white">GALEGO</h1>
+                <p className="font-manrope text-[10px] font-bold tracking-widest text-primary uppercase">
+                  - Depósito de Bebidas -
+                </p>
+              </div>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
+            <div className="flex items-center gap-2">
+              <a 
+                href="/" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-xs text-dark-muted hover:text-primary transition-colors px-3 py-2 rounded-lg border border-dark-border bg-dark-bg font-medium"
+              >
+                Ver Catálogo ↗
+              </a>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="text-red-400 hover:text-red-300">
+                <LogOut className="h-4 w-4 mr-1.5" />
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="flex gap-8">
+        <div className="flex flex-col md:flex-row gap-8">
           {/* Sidebar */}
-          <aside className="w-64 flex-shrink-0">
-            <nav className="space-y-2">
+          <aside className="w-full md:w-64 flex-shrink-0">
+            <nav className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all text-sm font-semibold whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'bg-primary text-white'
-                      : 'text-dark-muted hover:bg-dark-border hover:text-dark-text'
+                      ? 'bg-primary text-black shadow-lime-glow-sm'
+                      : 'text-dark-muted hover:bg-zinc-800/60 hover:text-white'
                   }`}
                 >
-                  <tab.icon className="h-5 w-5" />
-                  {tab.label}
+                  <tab.icon className="h-5 w-5 flex-shrink-0" />
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </nav>
@@ -510,29 +529,37 @@ function CategoryForm({ category, onSave, onCancel }: { category: Category, onSa
 
 function CouponsTab({ coupons, onUpdate }: { coupons: Coupon[], onUpdate: () => void }) {
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const handleSave = async (coupon: Coupon) => {
-    const isNew = !editingCoupon?.id
-    // Use coupon code as ID if creating a new coupon
-    if (isNew && !coupon.id) {
-      coupon.id = coupon.code.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    setSaving(true)
+    try {
+      const isNew = !editingCoupon?.id
+      if (isNew && !coupon.id) {
+        coupon.id = coupon.code.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `coupon-${Date.now()}`
+      }
+      const url = isNew ? '/api/coupons' : `/api/coupons/${coupon.id}`
+      const method = isNew ? 'POST' : 'PUT'
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coupon),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Erro ao salvar cupom. Verifique os campos.')
+        return
+      }
+
+      setEditingCoupon(null)
+      onUpdate()
+    } catch {
+      alert('Erro de conexão ao salvar cupom.')
+    } finally {
+      setSaving(false)
     }
-    const url = isNew ? '/api/coupons' : `/api/coupons/${coupon.id}`
-    const method = isNew ? 'POST' : 'PUT'
-
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(coupon),
-    })
-
-    if (!res.ok) {
-      alert('Erro ao salvar cupom. Verifique os campos.')
-      return
-    }
-
-    setEditingCoupon(null)
-    onUpdate()
   }
 
   const handleDelete = async (id: string) => {
@@ -545,67 +572,118 @@ function CouponsTab({ coupons, onUpdate }: { coupons: Coupon[], onUpdate: () => 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="font-anton text-2xl text-dark-text">Cupons</h2>
-        <Button onClick={() => setEditingCoupon({ id: '', code: '', discountType: 'percentage', discountValue: 0, minPurchase: 0, usedCount: 0, expiresAt: '', active: true } as Coupon)}>
+        <div>
+          <h2 className="font-anton text-2xl text-dark-text">Cupons de Desconto</h2>
+          <p className="text-sm text-dark-muted">Crie e gerencie códigos promocionais para seus clientes</p>
+        </div>
+        <Button onClick={() => setEditingCoupon({
+          id: '',
+          code: '',
+          discountType: 'percentage',
+          discountValue: 10,
+          minPurchase: 0,
+          usedCount: 0,
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          active: true
+        } as Coupon)}>
           <Plus className="h-4 w-4 mr-2" />
           Novo Cupom
         </Button>
       </div>
 
       {editingCoupon && (
-        <Card>
+        <Card className="border border-dark-border bg-dark-card/60">
           <CardContent className="p-6">
-            <CouponForm coupon={editingCoupon} onSave={handleSave} onCancel={() => setEditingCoupon(null)} />
+            <h3 className="font-semibold text-lg text-dark-text mb-4">
+              {editingCoupon.id ? 'Editar Cupom' : 'Criar Novo Cupom'}
+            </h3>
+            <CouponForm coupon={editingCoupon} onSave={handleSave} onCancel={() => setEditingCoupon(null)} saving={saving} />
           </CardContent>
         </Card>
       )}
 
-      <div className="space-y-4">
-        {coupons.map((coupon) => (
-          <Card key={coupon.id}>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex-1">
-                <h3 className="font-medium text-dark-text">{coupon.code}</h3>
-                <p className="text-sm text-dark-muted">
-                  {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `R$ ${coupon.discountValue}`} de desconto
-                </p>
-                <p className="text-sm text-dark-muted">Mínimo: R$ {coupon.minPurchase} | Usos: {coupon.usedCount}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setEditingCoupon(coupon)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDelete(coupon.id)}>
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {coupons.map((coupon) => {
+          const isExpired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()
+          return (
+            <Card key={coupon.id} className="border border-dark-border bg-dark-card/60">
+              <CardContent className="flex items-center justify-between gap-4 p-5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-lg text-primary tracking-wide">{coupon.code}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      coupon.active && !isExpired
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    }`}>
+                      {!coupon.active ? 'Inativo' : isExpired ? 'Expirado' : 'Ativo'}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-dark-text">
+                    {coupon.discountType === 'percentage' ? `${coupon.discountValue}% OFF` : `R$ ${coupon.discountValue.toFixed(2)} de desconto`}
+                  </p>
+                  <p className="text-xs text-dark-muted">
+                    Mínimo: {coupon.minPurchase > 0 ? `R$ ${coupon.minPurchase.toFixed(2)}` : 'Sem mínimo'} • Usos: {coupon.usedCount || 0}{coupon.maxUses ? ` / ${coupon.maxUses}` : ''}
+                  </p>
+                  {coupon.expiresAt && (
+                    <p className="text-xs text-dark-muted">
+                      Válido até: {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingCoupon(coupon)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDelete(coupon.id)}>
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (coupon: Coupon) => void, onCancel: () => void }) {
-  const [formData, setFormData] = useState(coupon)
+function CouponForm({
+  coupon,
+  onSave,
+  onCancel,
+  saving = false
+}: {
+  coupon: Coupon
+  onSave: (coupon: Coupon) => void
+  onCancel: () => void
+  saving?: boolean
+}) {
+  const [formData, setFormData] = useState<Coupon>(() => ({
+    ...coupon,
+    expiresAt: coupon.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  }))
   const noSpinner = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+
+  const dateValue = formData.expiresAt
+    ? formData.expiresAt.split('T')[0]
+    : new Date().toISOString().split('T')[0]
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData) }} className="space-y-5">
       {/* Código e Tipo */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Código do Cupom *</label>
           <Input
-            placeholder="Ex: PROMO10, FRETE0, NATAL50"
+            placeholder="Ex: PROMO10, FRETEGRATIS, NATAL50"
             value={formData.code}
-            onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+            onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s+/g, '') })}
             required
           />
-          <p className="text-xs text-dark-muted">Será convertido automaticamente para maiúsculas</p>
+          <p className="text-xs text-dark-muted">Código que o cliente digitará no carrinho</p>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Tipo de Desconto *</label>
           <select
             className="flex h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-dark-text focus:outline-none focus:ring-2 focus:ring-primary"
@@ -615,19 +693,20 @@ function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (cou
             <option value="percentage">Porcentagem (%) — Ex: 10% de desconto</option>
             <option value="fixed">Valor Fixo (R$) — Ex: R$ 5,00 de desconto</option>
           </select>
+          <p className="text-xs text-dark-muted">Escolha se o desconto é percentual ou em reais</p>
         </div>
       </div>
 
       {/* Valores */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
-            {formData.discountType === 'percentage' ? 'Desconto (%) *' : 'Desconto (R$) *'}
+            {formData.discountType === 'percentage' ? 'Valor do Desconto (%) *' : 'Valor do Desconto (R$) *'}
           </label>
           <Input
             type="number"
             step={formData.discountType === 'percentage' ? '1' : '0.01'}
-            min="0"
+            min="0.01"
             max={formData.discountType === 'percentage' ? '100' : undefined}
             placeholder={formData.discountType === 'percentage' ? 'Ex: 10' : 'Ex: 5.00'}
             value={formData.discountValue || ''}
@@ -636,11 +715,11 @@ function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (cou
             required
           />
           <p className="text-xs text-dark-muted">
-            {formData.discountType === 'percentage' ? 'Entre 1 e 100%' : 'Valor em reais'}
+            {formData.discountType === 'percentage' ? 'Entre 1% e 100%' : 'Valor em reais'}
           </p>
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Compra Mínima (R$) *</label>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Compra Mínima (R$)</label>
           <Input
             type="number"
             step="0.01"
@@ -649,16 +728,15 @@ function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (cou
             value={formData.minPurchase || ''}
             onChange={(e) => setFormData({ ...formData, minPurchase: parseFloat(e.target.value) || 0 })}
             className={noSpinner}
-            required
           />
-          <p className="text-xs text-dark-muted">0 = sem valor mínimo</p>
+          <p className="text-xs text-dark-muted">0 ou vazio = sem valor mínimo</p>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Limite de Usos</label>
           <Input
             type="number"
             min="1"
-            placeholder="Ex: 100 (deixe vazio = ilimitado)"
+            placeholder="Ex: 100"
             value={formData.maxUses || ''}
             onChange={(e) => setFormData({ ...formData, maxUses: e.target.value ? parseInt(e.target.value) : undefined })}
             className={noSpinner}
@@ -669,18 +747,23 @@ function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (cou
 
       {/* Data e Status */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Data de Expiração *</label>
           <Input
             type="date"
-            value={formData.expiresAt ? formData.expiresAt.split('T')[0] : ''}
-            onChange={(e) => setFormData({ ...formData, expiresAt: new Date(e.target.value).toISOString() })}
+            value={dateValue}
+            onChange={(e) => {
+              if (e.target.value) {
+                setFormData({ ...formData, expiresAt: `${e.target.value}T23:59:59.999Z` })
+              }
+            }}
             min={new Date().toISOString().split('T')[0]}
             required
           />
+          <p className="text-xs text-dark-muted">Válido até às 23:59 da data selecionada</p>
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Status</label>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Status do Cupom</label>
           <div className="flex h-10 items-center">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -689,20 +772,21 @@ function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (cou
                 onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
                 className="h-4 w-4 accent-primary"
               />
-              <span className="text-sm text-dark-text">
-                {formData.active ? '✅ Cupom ativo (visível para clientes)' : '❌ Cupom inativo (desabilitado)'}
+              <span className="text-sm text-dark-text font-medium">
+                {formData.active ? '✅ Cupom Ativo' : '❌ Cupom Desativado'}
               </span>
             </label>
           </div>
+          <p className="text-xs text-dark-muted">Desative para pausar o cupom temporariamente</p>
         </div>
       </div>
 
-      <div className="flex gap-2 pt-2 border-t border-dark-border">
-        <Button type="submit">
+      <div className="flex items-center gap-2 pt-2 border-t border-dark-border">
+        <Button type="submit" disabled={saving}>
           <Save className="h-4 w-4 mr-2" />
-          Salvar Cupom
+          {saving ? 'Salvando...' : 'Salvar Cupom'}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
           Cancelar
         </Button>
       </div>
@@ -711,7 +795,7 @@ function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (cou
 }
 
 function ConfigTab({ config, onUpdate }: { config: Config | null, onUpdate: () => void }) {
-  const [formData, setFormData] = useState(config || {
+  const [formData, setFormData] = useState<Config>(config || {
     storeName: '',
     whatsapp: '',
     address: '',
@@ -719,69 +803,215 @@ function ConfigTab({ config, onUpdate }: { config: Config | null, onUpdate: () =
     deliveryFee: 0,
     minOrderValue: 0,
     deliveryRadius: 0,
-  } as Config)
+  })
+  const [saving, setSaving] = useState(false)
+  const [savedSuccess, setSavedSuccess] = useState(false)
 
-  const handleSave = async () => {
-    await fetch('/api/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    })
-    onUpdate()
+  useEffect(() => {
+    if (config) {
+      setFormData(config)
+    }
+  }, [config])
+
+  const noSpinner = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setSaving(true)
+    setSavedSuccess(false)
+    try {
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) throw new Error('Erro ao salvar')
+      setSavedSuccess(true)
+      onUpdate()
+      setTimeout(() => setSavedSuccess(false), 4000)
+    } catch {
+      alert('Erro ao salvar as configurações. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="font-anton text-2xl text-dark-text">Configurações</h2>
-      
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <Input
-            placeholder="Nome da loja"
-            value={formData.storeName}
-            onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-          />
-          <Input
-            placeholder="WhatsApp (com DDD, sem +)"
-            value={formData.whatsapp}
-            onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-          />
-          <Input
-            placeholder="Endereço"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          />
-          <Input
-            placeholder="Horário de funcionamento"
-            value={formData.hours}
-            onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-          />
-          <Input
-            type="number"
-            step="0.01"
-            placeholder="Taxa de entrega"
-            value={formData.deliveryFee}
-            onChange={(e) => setFormData({ ...formData, deliveryFee: parseFloat(e.target.value) })}
-          />
-          <Input
-            type="number"
-            step="0.01"
-            placeholder="Valor mínimo de pedido"
-            value={formData.minOrderValue}
-            onChange={(e) => setFormData({ ...formData, minOrderValue: parseFloat(e.target.value) })}
-          />
-          <Input
-            type="number"
-            placeholder="Raio de entrega (km)"
-            value={formData.deliveryRadius}
-            onChange={(e) => setFormData({ ...formData, deliveryRadius: parseFloat(e.target.value) })}
-          />
-          <Button onClick={handleSave}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 className="font-anton text-2xl text-dark-text">Configurações da Loja</h2>
+          <p className="text-sm text-dark-muted">Personalize as informações públicas, atendimento e regras de entrega</p>
+        </div>
+        {savedSuccess && (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium animate-fadeIn">
+            ✓ Configurações salvas com sucesso!
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* Seção 1: Dados da Loja */}
+        <Card className="border border-dark-border bg-dark-card/60">
+          <CardContent className="p-6 space-y-4">
+            <div className="border-b border-dark-border/60 pb-3">
+              <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                <span>🏪</span> Identificação da Loja
+              </h3>
+              <p className="text-xs text-dark-muted mt-0.5">Nome e localização física da sua empresa</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Nome da Loja *
+                </label>
+                <Input
+                  placeholder="Ex: Galego — Depósito de Bebidas"
+                  value={formData.storeName}
+                  onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-dark-muted">Exibido no topo do site e nas mensagens</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Endereço Completo *
+                </label>
+                <Input
+                  placeholder="Ex: Rua das Flores, 123 - Centro, São Paulo - SP"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-dark-muted">Visível no rodapé e informações de contato</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seção 2: Atendimento e Contato */}
+        <Card className="border border-dark-border bg-dark-card/60">
+          <CardContent className="p-6 space-y-4">
+            <div className="border-b border-dark-border/60 pb-3">
+              <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                <span>📱</span> Atendimento & WhatsApp
+              </h3>
+              <p className="text-xs text-dark-muted mt-0.5">Canal de recebimento dos pedidos e expediente</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  WhatsApp para Pedidos *
+                </label>
+                <Input
+                  placeholder="Ex: 5511999999999 (com DDD, somente números)"
+                  value={formData.whatsapp}
+                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value.replace(/\D/g, '') })}
+                  required
+                />
+                <p className="text-xs text-dark-muted">
+                  Código do país (55) + DDD + Número. Ex: <span className="text-primary font-mono">5511987654321</span>
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Horário de Funcionamento *
+                </label>
+                <Input
+                  placeholder="Ex: Seg a Sex: 09h às 22h | Sáb e Dom: 09h às 00h"
+                  value={formData.hours}
+                  onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-dark-muted">Informado aos clientes no cabeçalho e rodapé</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seção 3: Regras de Entrega */}
+        <Card className="border border-dark-border bg-dark-card/60">
+          <CardContent className="p-6 space-y-4">
+            <div className="border-b border-dark-border/60 pb-3">
+              <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                <span>🛵</span> Regras de Entrega & Pedidos
+              </h3>
+              <p className="text-xs text-dark-muted mt-0.5">Valores aplicados automaticamente no carrinho</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Taxa de Entrega (R$) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Ex: 5.00"
+                  value={formData.deliveryFee || ''}
+                  onChange={(e) => setFormData({ ...formData, deliveryFee: parseFloat(e.target.value) || 0 })}
+                  className={noSpinner}
+                  required
+                />
+                <p className="text-xs text-dark-muted">0 = Frete grátis padrão</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Valor Mínimo do Pedido (R$) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Ex: 20.00"
+                  value={formData.minOrderValue || ''}
+                  onChange={(e) => setFormData({ ...formData, minOrderValue: parseFloat(e.target.value) || 0 })}
+                  className={noSpinner}
+                  required
+                />
+                <p className="text-xs text-dark-muted">0 = Sem valor mínimo</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Raio Máximo de Entrega (km) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder="Ex: 10"
+                  value={formData.deliveryRadius || ''}
+                  onChange={(e) => setFormData({ ...formData, deliveryRadius: parseFloat(e.target.value) || 0 })}
+                  className={noSpinner}
+                  required
+                />
+                <p className="text-xs text-dark-muted">Distância limite para entrega</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Botão de Salvar */}
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="submit" disabled={saving} className="px-6">
             <Save className="h-4 w-4 mr-2" />
-            Salvar Configurações
+            {saving ? 'Salvando...' : 'Salvar Configurações'}
           </Button>
-        </CardContent>
-      </Card>
+          {savedSuccess && (
+            <span className="text-sm text-green-400 font-medium animate-fadeIn">
+              Alterações aplicadas com sucesso!
+            </span>
+          )}
+        </div>
+      </form>
     </div>
   )
 }
+

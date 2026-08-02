@@ -19,20 +19,17 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Temporarily disable API protection for development without Redis
-  // Protect write API routes
-  if (pathname.startsWith('/api') && 
-      (pathname.includes('/products') && 
-       (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') ||
-       pathname.includes('/categories') && 
-       (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') ||
-       pathname.includes('/coupons') && 
-       (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') ||
-       pathname.includes('/config') && 
-       request.method === 'PUT')) {
-    
+  // Protect write API routes (exclude public endpoints like /api/coupons/validate)
+  const isProtectedApiWrite =
+    pathname.startsWith('/api') &&
+    pathname !== '/api/coupons/validate' &&
+    ((pathname.includes('/products') && ['POST', 'PUT', 'DELETE'].includes(request.method)) ||
+     (pathname.includes('/categories') && ['POST', 'PUT', 'DELETE'].includes(request.method)) ||
+     (pathname.includes('/coupons') && ['POST', 'PUT', 'DELETE'].includes(request.method)) ||
+     (pathname.includes('/config') && request.method === 'PUT'))
+
+  if (isProtectedApiWrite) {
     const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)
-    
     if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

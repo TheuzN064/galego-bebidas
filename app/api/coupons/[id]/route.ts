@@ -30,8 +30,20 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const coupon: Coupon = await request.json()
-    coupon.id = params.id
+    const body = await request.json()
+    const cleanCode = String(body.code).trim().toUpperCase()
+
+    const coupon: Coupon = {
+      id: params.id,
+      code: cleanCode,
+      discountType: body.discountType,
+      discountValue: Number(body.discountValue),
+      minPurchase: Number(body.minPurchase) || 0,
+      maxUses: body.maxUses ? Number(body.maxUses) : undefined,
+      usedCount: Number(body.usedCount) || 0,
+      expiresAt: body.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      active: body.active !== false,
+    }
 
     await updateCoupon(coupon)
     return NextResponse.json(coupon)

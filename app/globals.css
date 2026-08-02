@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4%;
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
   }
   
@@ -13,13 +13,25 @@
   }
   
   body {
-    @apply bg-dark-bg text-dark-text antialiased;
+    @apply bg-dark-bg text-dark-text antialiased selection:bg-primary selection:text-black;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .glow-lime {
+    box-shadow: 0 0 25px rgba(132, 204, 22, 0.35);
+  }
+
+  .glow-lime-sm {
+    box-shadow: 0 0 12px rgba(132, 204, 22, 0.25);
+  }
+
+  .text-glow-lime {
+    text-shadow: 0 0 12px rgba(132, 204, 22, 0.5);
   }
 }
 
@@ -34,9 +46,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-dark-border rounded-full;
+  @apply bg-dark-border rounded-full transition-colors;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-primary;
 }
+

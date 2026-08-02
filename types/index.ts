@@ -49,6 +49,19 @@ export interface CartItem {
   quantity: number
 }
 
+export interface CustomerInfo {
+  name: string
+  phone: string
+  cep?: string
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city?: string
+  reference?: string
+  address?: string
+}
+
 export interface Order {
   items: CartItem[]
   subtotal: number
@@ -56,11 +69,8 @@ export interface Order {
   discount: number
   couponCode?: string
   total: number
-  customer: {
-    name: string
-    phone: string
-    address: string
-  }
+  customer: CustomerInfo
   paymentMethod: string
+  changeFor?: string
   notes?: string
 }
