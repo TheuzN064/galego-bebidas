@@ -262,4 +262,4 @@ Este projeto é fornecido como está para uso pessoal e comercial.
 
 Para questões ou problemas, verifique a documentação ou abra uma issue no repositório.
 #   a l c o o l  
- 
+ "# galego-bebidas" 
