@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CartItem, Config } from '@/types'
+import { CartItem, Config, Order } from '@/types'
 import { formatCurrency, formatWhatsAppMessage } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { Card, CardContent } from './ui/card'
 import { 
   X, 
   Loader2, 
@@ -21,7 +20,11 @@ import {
   Send, 
   Check, 
   Search,
-  MessageSquare
+  MessageSquare,
+  Bike,
+  Store,
+  Clock,
+  ExternalLink
 } from 'lucide-react'
 
 interface CheckoutModalProps {
@@ -42,7 +45,10 @@ export function CheckoutModal({
   const [loading, setLoading] = useState(false)
   const [config, setConfig] = useState<Config | null>(null)
   
-  // Customer & Address state (separated)
+  // Delivery Type: 'delivery' (Entrega) vs 'pickup' (Retirada)
+  const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('delivery')
+
+  // Customer & Address state
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -79,8 +85,9 @@ export function CheckoutModal({
 
   if (!isOpen) return null
 
-  const deliveryFee = config?.deliveryFee || 0
-  const minOrderValue = config?.minOrderValue || 0
+  const isPickup = deliveryType === 'pickup'
+  const deliveryFee = isPickup ? 0 : (config?.deliveryFee || 0)
+  const minOrderValue = isPickup ? 0 : (config?.minOrderValue || 0)
   const total = Math.max(0, subtotal + deliveryFee - discount)
 
   // Phone input formatting
@@ -187,8 +194,8 @@ export function CheckoutModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (subtotal < minOrderValue) {
-      alert(`Valor mínimo de pedido: ${formatCurrency(minOrderValue)}`)
+    if (!isPickup && subtotal < minOrderValue) {
+      alert(`Valor mínimo de pedido para entrega: ${formatCurrency(minOrderValue)}`)
       return
     }
 
@@ -202,8 +209,8 @@ export function CheckoutModal({
       return
     }
 
-    if (!formData.street.trim() || !formData.number.trim() || !formData.neighborhood.trim()) {
-      alert('Por favor, preencha os dados completos do endereço (Rua, Número e Bairro).')
+    if (!isPickup && (!formData.street.trim() || !formData.number.trim() || !formData.neighborhood.trim())) {
+      alert('Por favor, preencha os dados completos do endereço de entrega (Rua, Número e Bairro).')
       return
     }
 
@@ -212,23 +219,25 @@ export function CheckoutModal({
     try {
       const finalConfig = config || await (await fetch('/api/config')).json()
 
-      const order = {
+      const order: Order = {
         items,
         subtotal,
         deliveryFee,
+        deliveryType,
         discount,
         couponCode: discount > 0 ? (appliedCoupon || formData.couponCode) : undefined,
         total,
         customer: {
           name: formData.name.trim(),
           phone: formData.phone.trim(),
-          cep: formData.cep.trim(),
-          street: formData.street.trim(),
-          number: formData.number.trim(),
-          complement: formData.complement.trim(),
-          neighborhood: formData.neighborhood.trim(),
-          city: formData.city.trim(),
-          reference: formData.reference.trim(),
+          deliveryType,
+          cep: isPickup ? undefined : formData.cep.trim(),
+          street: isPickup ? undefined : formData.street.trim(),
+          number: isPickup ? undefined : formData.number.trim(),
+          complement: isPickup ? undefined : formData.complement.trim(),
+          neighborhood: isPickup ? undefined : formData.neighborhood.trim(),
+          city: isPickup ? undefined : formData.city.trim(),
+          reference: isPickup ? undefined : formData.reference.trim(),
         },
         paymentMethod: formData.paymentMethod,
         changeFor: formData.paymentMethod === 'Dinheiro' && formData.needsChange ? formData.changeFor : undefined,
@@ -236,7 +245,7 @@ export function CheckoutModal({
       }
 
       const message = formatWhatsAppMessage(order, finalConfig)
-      const whatsappNumber = finalConfig.whatsapp.replace(/\D/g, '')
+      const whatsappNumber = (finalConfig.whatsapp || '').replace(/\D/g, '')
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
 
       window.open(whatsappUrl, '_blank')
@@ -252,10 +261,13 @@ export function CheckoutModal({
 
   const paymentMethods = [
     { id: 'PIX', label: 'PIX', icon: QrCode, desc: 'Chave enviada no WhatsApp' },
-    { id: 'Cartão de Crédito', label: 'Crédito', icon: CreditCard, desc: 'Máquina na entrega' },
-    { id: 'Cartão de Débito', label: 'Débito', icon: CreditCard, desc: 'Máquina na entrega' },
-    { id: 'Dinheiro', label: 'Dinheiro', icon: Banknote, desc: 'Pagamento na entrega' },
+    { id: 'Cartão de Crédito', label: 'Crédito', icon: CreditCard, desc: isPickup ? 'Máquina no balcão' : 'Máquina na entrega' },
+    { id: 'Cartão de Débito', label: 'Débito', icon: CreditCard, desc: isPickup ? 'Máquina no balcão' : 'Máquina na entrega' },
+    { id: 'Dinheiro', label: 'Dinheiro', icon: Banknote, desc: isPickup ? 'Pagamento no balcão' : 'Pagamento na entrega' },
   ]
+
+  const storeAddress = config?.address || 'Rua das Bebidas, 123 - Centro'
+  const storeHours = config?.hours || 'Seg-Sex: 9h-20h | Sáb: 9h-18h'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -290,7 +302,60 @@ export function CheckoutModal({
 
         {/* Modal Form Scrollable Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-6 overflow-y-auto flex-1">
-          {/* 1. Order Summary */}
+          {/* 1. Delivery Type Selection (Entrega vs Retirada) */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+              Como deseja receber seu pedido?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Option: Delivery */}
+              <button
+                type="button"
+                onClick={() => setDeliveryType('delivery')}
+                className={`relative flex flex-col items-center text-center p-3.5 rounded-xl border transition-all duration-200 ${
+                  deliveryType === 'delivery'
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/40 shadow-lime-glow-sm text-white'
+                    : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                }`}
+              >
+                <div className={`p-2 rounded-full mb-1.5 ${deliveryType === 'delivery' ? 'bg-primary text-black' : 'bg-zinc-800 text-zinc-400'}`}>
+                  <Bike className="h-5 w-5" />
+                </div>
+                <span className="font-anton text-sm tracking-wide">Entrega Delivery</span>
+                <span className="text-[11px] text-zinc-400 mt-0.5">
+                  {config?.deliveryFee ? `Taxa de ${formatCurrency(config.deliveryFee)}` : 'Receba em casa'}
+                </span>
+                {deliveryType === 'delivery' && (
+                  <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                )}
+              </button>
+
+              {/* Option: Pickup */}
+              <button
+                type="button"
+                onClick={() => setDeliveryType('pickup')}
+                className={`relative flex flex-col items-center text-center p-3.5 rounded-xl border transition-all duration-200 ${
+                  deliveryType === 'pickup'
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/40 shadow-lime-glow-sm text-white'
+                    : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                }`}
+              >
+                <span className="absolute -top-2 right-2 bg-primary text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                  GRÁTIS
+                </span>
+                <div className={`p-2 rounded-full mb-1.5 ${deliveryType === 'pickup' ? 'bg-primary text-black' : 'bg-zinc-800 text-zinc-400'}`}>
+                  <Store className="h-5 w-5" />
+                </div>
+                <span className="font-anton text-sm tracking-wide">Retirar na Loja</span>
+                <span className="text-[11px] text-primary font-semibold mt-0.5">Sem taxa de entrega</span>
+                {deliveryType === 'pickup' && (
+                  <div className="absolute top-2 left-2 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Order Summary */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Resumo da Compra</span>
@@ -321,8 +386,10 @@ export function CheckoutModal({
                 <span className="font-mono text-zinc-200">{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex justify-between text-zinc-400">
-                <span>Taxa de entrega</span>
-                <span className="font-mono text-zinc-200">{formatCurrency(deliveryFee)}</span>
+                <span>Tipo de Pedido</span>
+                <span className="text-zinc-200 font-medium">
+                  {isPickup ? 'Retirada na Loja (Grátis)' : `Entrega (${formatCurrency(deliveryFee)})`}
+                </span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-primary font-semibold">
@@ -337,7 +404,7 @@ export function CheckoutModal({
             </div>
           </div>
 
-          {/* 2. Coupon Input */}
+          {/* 3. Coupon Input */}
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
               <span>🎟️</span> Cupom de Desconto
@@ -394,7 +461,7 @@ export function CheckoutModal({
             )}
           </div>
 
-          {/* 3. Customer Personal Info */}
+          {/* 4. Customer Personal Info */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 border-b border-zinc-800/80 pb-1.5">
               <User className="h-3.5 w-3.5 text-primary" />
@@ -437,147 +504,194 @@ export function CheckoutModal({
             </div>
           </div>
 
-          {/* 4. Complete & Separated Address Info */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-primary" />
-                <span>Endereço de Entrega</span>
-              </h3>
-              <span className="text-[10px] text-zinc-500">Campos completos</span>
-            </div>
+          {/* 5. Address OR Store Pickup Details */}
+          {isPickup ? (
+            /* STORE PICKUP DETAILS CARD */
+            <div className="rounded-2xl border border-primary/40 bg-zinc-900/90 p-4 space-y-3 shadow-lime-glow-sm animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 text-primary font-anton text-base tracking-wide border-b border-zinc-800 pb-2">
+                <Store className="h-5 w-5" />
+                <span>LOCAL PARA RETIRADA</span>
+              </div>
 
-            {/* CEP with auto-complete */}
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-[11px] font-medium text-zinc-400">
-                  CEP (opcional para preenchimento rápido)
-                </label>
-                {cepLoading && (
-                  <span className="text-[10px] text-primary flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Buscando endereço...
-                  </span>
+              <div className="space-y-2 text-xs">
+                <div>
+                  <p className="text-[11px] uppercase font-bold text-zinc-400">Endereço da Loja:</p>
+                  <p className="font-semibold text-white text-sm mt-0.5 flex items-start gap-1.5">
+                    <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <span>{storeAddress}</span>
+                  </p>
+                </div>
+
+                {storeHours && (
+                  <div>
+                    <p className="text-[11px] uppercase font-bold text-zinc-400">Horário de Funcionamento:</p>
+                    <p className="text-zinc-300 mt-0.5 flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span>{storeHours}</span>
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-primary hover:text-primary-light text-xs font-bold transition-all border border-zinc-700"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Ver no Google Maps / Traçar Rota</span>
+                  </a>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary-light text-[11px] leading-relaxed">
+                  💡 <strong>Como funciona:</strong> Ao clicar no botão abaixo, seu pedido será enviado pelo WhatsApp. A equipe irá separar os itens e avisar quando estiver pronto para você retirar no balcão!
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* DELIVERY ADDRESS FIELDS */
+            <div className="space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  <span>Endereço de Entrega</span>
+                </h3>
+                <span className="text-[10px] text-zinc-500">Campos completos</span>
+              </div>
+
+              {/* CEP with auto-complete */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[11px] font-medium text-zinc-400">
+                    CEP (opcional para preenchimento rápido)
+                  </label>
+                  {cepLoading && (
+                    <span className="text-[10px] text-primary flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Buscando endereço...
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <Input
+                      placeholder="00000-000"
+                      value={formData.cep}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => searchCep(formData.cep)}
+                    disabled={cepLoading || formData.cep.replace(/\D/g, '').length !== 8}
+                    className="h-10 px-3 text-xs border-zinc-700 hover:border-primary"
+                  >
+                    <Search className="h-3.5 w-3.5 mr-1" /> Buscar
+                  </Button>
+                </div>
+                {cepMessage && (
+                  <p className={`text-[11px] mt-1 font-medium ${cepMessage.startsWith('✓') ? 'text-primary' : 'text-amber-400'}`}>
+                    {cepMessage}
+                  </p>
                 )}
               </div>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                  <Input
-                    placeholder="00000-000"
-                    value={formData.cep}
-                    onChange={(e) => handleCepChange(e.target.value)}
-                    className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => searchCep(formData.cep)}
-                  disabled={cepLoading || formData.cep.replace(/\D/g, '').length !== 8}
-                  className="h-10 px-3 text-xs border-zinc-700 hover:border-primary"
-                >
-                  <Search className="h-3.5 w-3.5 mr-1" /> Buscar
-                </Button>
-              </div>
-              {cepMessage && (
-                <p className={`text-[11px] mt-1 font-medium ${cepMessage.startsWith('✓') ? 'text-primary' : 'text-amber-400'}`}>
-                  {cepMessage}
-                </p>
-              )}
-            </div>
 
-            {/* Street / Logradouro */}
-            <div>
-              <label className="text-[11px] font-medium text-zinc-400 block mb-1">
-                Rua / Avenida / Logradouro <span className="text-red-400">*</span>
-              </label>
-              <div className="relative">
-                <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-                <Input
-                  placeholder="Ex: Rua das Flores, Av. Brasil"
-                  required
-                  value={formData.street}
-                  onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                  className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
-                />
-              </div>
-            </div>
-
-            {/* Number & Complement in 2 Columns */}
-            <div className="grid grid-cols-2 gap-3">
+              {/* Street / Logradouro */}
               <div>
                 <label className="text-[11px] font-medium text-zinc-400 block mb-1">
-                  Número <span className="text-red-400">*</span>
+                  Rua / Avenida / Logradouro <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                   <Input
-                    placeholder="Ex: 123 ou S/N"
-                    required
-                    value={formData.number}
-                    onChange={(e) => setFormData(prev => ({ ...prev, number: e.target.value }))}
+                    placeholder="Ex: Rua das Flores, Av. Brasil"
+                    required={!isPickup}
+                    value={formData.street}
+                    onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
                     className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
                   />
                 </div>
               </div>
 
+              {/* Number & Complement in 2 Columns */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+                    Número <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <Input
+                      placeholder="Ex: 123 ou S/N"
+                      required={!isPickup}
+                      value={formData.number}
+                      onChange={(e) => setFormData(prev => ({ ...prev, number: e.target.value }))}
+                      className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+                    Complemento
+                  </label>
+                  <Input
+                    placeholder="Apto 102, Bloco B..."
+                    value={formData.complement}
+                    onChange={(e) => setFormData(prev => ({ ...prev, complement: e.target.value }))}
+                    className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
+                  />
+                </div>
+              </div>
+
+              {/* Neighborhood & City in 2 Columns */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+                    Bairro <span className="text-red-400">*</span>
+                  </label>
+                  <Input
+                    placeholder="Ex: Centro, Bessa"
+                    required={!isPickup}
+                    value={formData.neighborhood}
+                    onChange={(e) => setFormData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                    className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+                    Cidade / UF
+                  </label>
+                  <Input
+                    placeholder="Ex: João Pessoa - PB"
+                    value={formData.city}
+                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                    className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
+                  />
+                </div>
+              </div>
+
+              {/* Reference Point */}
               <div>
                 <label className="text-[11px] font-medium text-zinc-400 block mb-1">
-                  Complemento
+                  Ponto de Referência (opcional)
                 </label>
                 <Input
-                  placeholder="Apto 102, Bloco B..."
-                  value={formData.complement}
-                  onChange={(e) => setFormData(prev => ({ ...prev, complement: e.target.value }))}
+                  placeholder="Ex: Em frente à padaria, portão preto"
+                  value={formData.reference}
+                  onChange={(e) => setFormData(prev => ({ ...prev, reference: e.target.value }))}
                   className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
                 />
               </div>
             </div>
+          )}
 
-            {/* Neighborhood & City in 2 Columns */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-zinc-400 block mb-1">
-                  Bairro <span className="text-red-400">*</span>
-                </label>
-                <Input
-                  placeholder="Ex: Centro, Bessa"
-                  required
-                  value={formData.neighborhood}
-                  onChange={(e) => setFormData(prev => ({ ...prev, neighborhood: e.target.value }))}
-                  className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-zinc-400 block mb-1">
-                  Cidade / UF
-                </label>
-                <Input
-                  placeholder="Ex: João Pessoa - PB"
-                  value={formData.city}
-                  onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                  className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
-                />
-              </div>
-            </div>
-
-            {/* Reference Point */}
-            <div>
-              <label className="text-[11px] font-medium text-zinc-400 block mb-1">
-                Ponto de Referência (opcional)
-              </label>
-              <Input
-                placeholder="Ex: Em frente à padaria, portão preto"
-                value={formData.reference}
-                onChange={(e) => setFormData(prev => ({ ...prev, reference: e.target.value }))}
-                className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
-              />
-            </div>
-          </div>
-
-          {/* 5. Payment Method */}
+          {/* 6. Payment Method */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 border-b border-zinc-800/80 pb-1.5">
               <CreditCard className="h-3.5 w-3.5 text-primary" />
@@ -637,21 +751,21 @@ export function CheckoutModal({
             )}
           </div>
 
-          {/* 6. Order Notes */}
+          {/* 7. Order Notes */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
               <MessageSquare className="h-3.5 w-3.5 text-primary" />
               <span>Observações (opcional)</span>
             </label>
             <Input
-              placeholder="Ex: Bebidas bem geladas por favor, não buzinar..."
+              placeholder="Ex: Bebidas bem geladas por favor, embalagem para presente..."
               value={formData.notes}
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               className="bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
             />
           </div>
 
-          {subtotal < minOrderValue && (
+          {!isPickup && subtotal < minOrderValue && (
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium text-center">
               ⚠️ Valor mínimo para entrega: <strong>{formatCurrency(minOrderValue)}</strong>
             </div>
@@ -661,7 +775,7 @@ export function CheckoutModal({
           <Button
             type="submit"
             className="w-full h-12 text-base font-anton tracking-wider text-black bg-primary hover:bg-primary-light transition-all shadow-lime-glow flex items-center justify-center gap-2 rounded-xl"
-            disabled={loading || subtotal < minOrderValue}
+            disabled={loading || (!isPickup && subtotal < minOrderValue)}
           >
             {loading ? (
               <>

@@ -22,48 +22,63 @@ export function formatWhatsAppMessage(order: any, config?: any): string {
     return `▪ ${item.quantity}x ${name} - ${formatCurrency(unitPrice * item.quantity)}`
   }).join('\n')
 
-  const total = Math.max(0, order.subtotal + order.deliveryFee - (order.discount || 0))
+  const isPickup = order.deliveryType === 'pickup'
+  const deliveryFee = isPickup ? 0 : (order.deliveryFee || 0)
+  const total = Math.max(0, order.subtotal + deliveryFee - (order.discount || 0))
   const discountText = order.discount > 0 ? `\n🎟️ *Desconto:* -${formatCurrency(order.discount)}` : ''
   const couponText = order.couponCode ? `\n🏷️ *Cupom Aplicado:* ${order.couponCode}` : ''
 
-  // Format full address
-  let addressText = ''
-  if (typeof order.customer.address === 'string' && order.customer.address && !order.customer.street) {
-    addressText = order.customer.address
+  // Format delivery/pickup section
+  let deliverySection = ''
+  if (isPickup) {
+    deliverySection = `🏬 *TIPO DE PEDIDO:* RETIRADA NA LOJA
+📍 *Local de Retirada:* ${config?.address || 'Depósito Galego Bebidas'}
+${config?.hours ? `🕒 *Horário:* ${config.hours}` : ''}`
   } else {
-    const lines: string[] = []
-    if (order.customer.street) {
-      lines.push(`${order.customer.street}, Nº ${order.customer.number || 'S/N'}`)
+    let addressText = ''
+    if (typeof order.customer?.address === 'string' && order.customer.address && !order.customer.street) {
+      addressText = order.customer.address
+    } else if (order.customer) {
+      const lines: string[] = []
+      if (order.customer.street) {
+        lines.push(`${order.customer.street}, Nº ${order.customer.number || 'S/N'}`)
+      }
+      if (order.customer.complement) {
+        lines.push(`Complemento: ${order.customer.complement}`)
+      }
+      if (order.customer.neighborhood) {
+        lines.push(`Bairro: ${order.customer.neighborhood}`)
+      }
+      if (order.customer.city) {
+        lines.push(`Cidade: ${order.customer.city}`)
+      }
+      if (order.customer.reference) {
+        lines.push(`Ponto de Ref.: ${order.customer.reference}`)
+      }
+      if (order.customer.cep) {
+        lines.push(`CEP: ${order.customer.cep}`)
+      }
+      addressText = lines.join('\n')
     }
-    if (order.customer.complement) {
-      lines.push(`Complemento: ${order.customer.complement}`)
-    }
-    if (order.customer.neighborhood) {
-      lines.push(`Bairro: ${order.customer.neighborhood}`)
-    }
-    if (order.customer.city) {
-      lines.push(`Cidade: ${order.customer.city}`)
-    }
-    if (order.customer.reference) {
-      lines.push(`Ponto de Ref.: ${order.customer.reference}`)
-    }
-    if (order.customer.cep) {
-      lines.push(`CEP: ${order.customer.cep}`)
-    }
-    addressText = lines.join('\n')
+
+    deliverySection = `🛵 *TIPO DE PEDIDO:* ENTREGA DELIVERY
+📍 *ENDEREÇO DE ENTREGA:*
+${addressText || 'Não informado'}`
   }
 
   const changeText = order.changeFor ? ` (Troco para ${formatCurrency(Number(order.changeFor) || 0)})` : ''
+  const feeLine = isPickup 
+    ? `🏬 *Entrega:* Grátis (Retirada no Local)` 
+    : `🛵 *Taxa de entrega:* ${formatCurrency(deliveryFee)}`
 
   return `🍺 *NOVO PEDIDO - GALEGO BEBIDAS* 🍺
 ━━━━━━━━━━━━━━━━━━━━
 
-👤 *DADOS DO CLIENTE:*
-▪ *Nome:* ${order.customer.name}
-▪ *WhatsApp:* ${order.customer.phone}
+${deliverySection}
 
-📍 *ENDEREÇO DE ENTREGA:*
-${addressText ? addressText : 'Não informado'}
+👤 *DADOS DO CLIENTE:*
+▪ *Nome:* ${order.customer?.name || 'Cliente'}
+▪ *WhatsApp:* ${order.customer?.phone || 'Não informado'}
 
 ━━━━━━━━━━━━━━━━━━━━
 🛒 *ITENS DO PEDIDO:*
@@ -71,7 +86,7 @@ ${items}
 
 ━━━━━━━━━━━━━━━━━━━━
 ${couponText}💰 *Subtotal:* ${formatCurrency(order.subtotal)}
-🛵 *Taxa de entrega:* ${formatCurrency(order.deliveryFee)}${discountText}
+${feeLine}${discountText}
 🔥 *TOTAL DO PEDIDO:* ${formatCurrency(total)}
 
 💳 *Forma de pagamento:* ${order.paymentMethod}${changeText}

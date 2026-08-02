@@ -52,11 +52,12 @@ export interface CartItem {
 export interface CustomerInfo {
   name: string
   phone: string
+  deliveryType?: 'delivery' | 'pickup'
   cep?: string
-  street: string
-  number: string
+  street?: string
+  number?: string
   complement?: string
-  neighborhood: string
+  neighborhood?: string
   city?: string
   reference?: string
   address?: string
@@ -66,6 +67,7 @@ export interface Order {
   items: CartItem[]
   subtotal: number
   deliveryFee: number
+  deliveryType: 'delivery' | 'pickup'
   discount: number
   couponCode?: string
   total: number
