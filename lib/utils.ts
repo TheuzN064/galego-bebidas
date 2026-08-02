@@ -95,3 +95,33 @@ ${feeLine}${discountText}
 ━━━━━━━━━━━━━━━━━━━━
 ⚡ _Pedido enviado via Catálogo Online Galego_`
 }
+
+/**
+ * Formats a Brazilian or international phone number for WhatsApp API
+ * Ensures country code (55 for BR) is present if phone has standard 10 or 11 digits
+ */
+export function formatWhatsAppPhone(phone: string): string {
+  const clean = (phone || '').replace(/\D/g, '')
+  if (!clean) return ''
+  
+  // Standard Brazilian phone with DDD (10 or 11 digits)
+  if (clean.length === 10 || clean.length === 11) {
+    return `55${clean}`
+  }
+  
+  return clean
+}
+
+/**
+ * Creates a valid https://wa.me/ URL with normalized phone and encoded message
+ */
+export function getWhatsAppUrl(phone: string, message?: string): string {
+  const cleanPhone = formatWhatsAppPhone(phone)
+  if (!cleanPhone) return '#'
+  
+  if (!message) {
+    return `https://wa.me/${cleanPhone}`
+  }
+  
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
+}

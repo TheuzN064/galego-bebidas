@@ -33,10 +33,16 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
       <div>
         <div className="relative aspect-square overflow-hidden bg-dark-bg">
           <img
-            src={product.image}
+            src={product.image || '/logo.png'}
             alt={product.name}
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.onerror = null
+              e.currentTarget.src = '/logo.png'
+            }}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
+
           
           {/* Badges */}
           <div className="absolute left-2 top-2 flex flex-col gap-1">

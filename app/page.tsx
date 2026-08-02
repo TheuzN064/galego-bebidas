@@ -7,7 +7,7 @@ import { CategoryCard } from '@/components/CategoryCard'
 import { ShoppingCart } from '@/components/ShoppingCart'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getWhatsAppUrl } from '@/lib/utils'
 import { 
   Search, 
   Share2, 
@@ -24,8 +24,11 @@ import {
   X,
   Megaphone,
   Moon,
-  MessageCircle
+  MessageCircle,
+  Copy,
+  Check
 } from 'lucide-react'
+
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([])
@@ -38,6 +41,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ id: number; message: string; product: Product } | null>(null)
   const [dismissedAnnouncement, setDismissedAnnouncement] = useState(false)
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -146,10 +151,15 @@ export default function Home() {
   }
 
   const handleQRCode = () => {
-    window.open(
-      `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.href)}`,
-      '_blank'
-    )
+    setIsQrModalOpen(true)
+  }
+
+  const handleCopyLink = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 2500)
+    }
   }
 
   if (loading) {
@@ -483,11 +493,17 @@ export default function Home() {
               </span>
             )}
             {config?.whatsapp && (
-              <span className="flex items-center gap-1">
+              <a 
+                href={getWhatsAppUrl(config.whatsapp, 'Olá! Gostaria de tirar uma dúvida sobre o cardápio.')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-zinc-400 hover:text-primary transition-colors"
+              >
                 <Phone className="h-3.5 w-3.5 text-primary" />
                 WhatsApp: {config.whatsapp}
-              </span>
+              </a>
             )}
+
           </div>
 
           <div className="pt-4 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between text-xs gap-2">
@@ -526,6 +542,10 @@ export default function Home() {
                 <img 
                   src={toast.product.image} 
                   alt={toast.product.name} 
+                  onError={(e) => {
+                    e.currentTarget.onerror = null
+                    e.currentTarget.src = '/logo.png'
+                  }}
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
@@ -568,6 +588,75 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Native QR Code Modal */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setIsQrModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 text-center">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-primary" />
+                <h3 className="font-anton text-lg tracking-wide text-white">QR CODE DO CARDÁPIO</h3>
+              </div>
+              <button
+                onClick={() => setIsQrModalOpen(false)}
+                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="flex flex-col items-center justify-center space-y-3">
+              <div className="p-4 rounded-2xl bg-white shadow-lime-glow-sm inline-block">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : 'https://www.galegodepbebidas.shop')}`}
+                  alt="QR Code do Cardápio"
+                  className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                />
+              </div>
+              <p className="text-xs text-zinc-400 max-w-xs">
+                Aponte a câmera do celular para abrir o catálogo digital diretamente na loja ou compartilhar com amigos!
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-1">
+              <Button
+                onClick={handleCopyLink}
+                className="w-full h-11 font-anton tracking-wide text-black bg-primary hover:bg-primary-light flex items-center justify-center gap-2 rounded-xl transition-all"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="h-4 w-4 stroke-[3]" />
+                    <span>LINK COPIADO COM SUCESSO!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>COPIAR LINK DO CARDÁPIO</span>
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setIsQrModalOpen(false)}
+                className="w-full h-10 text-xs border-zinc-800 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

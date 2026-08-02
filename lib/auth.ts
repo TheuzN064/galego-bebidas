@@ -2,9 +2,19 @@ import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { getConfig } from './db'
+import { 
+  SESSION_COOKIE_NAME, 
+  SESSION_MAX_AGE, 
+  createSessionCookie, 
+  verifyAdminSession 
+} from './session'
 
-const SESSION_COOKIE_NAME = 'admin_session'
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
+export { 
+  SESSION_COOKIE_NAME, 
+  SESSION_MAX_AGE, 
+  createSessionCookie, 
+  verifyAdminSession 
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return await bcrypt.hash(password, 10)
@@ -12,11 +22,6 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return await bcrypt.compare(password, hash)
-}
-
-export function createSessionCookie(): string {
-  const sessionId = crypto.randomUUID()
-  return sessionId
 }
 
 export function setSessionCookie(sessionId: string) {
@@ -31,23 +36,6 @@ export function setSessionCookie(sessionId: string) {
 
 export function deleteSessionCookie() {
   cookies().delete(SESSION_COOKIE_NAME)
-}
-
-export async function verifyAdminSession(request: NextRequest): Promise<boolean> {
-  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)
-  
-  if (!sessionCookie) {
-    return false
-  }
-
-  // In a real implementation, you would validate the session against Redis
-  // For now, we'll check if the cookie exists and has a valid format
-  try {
-    const sessionId = sessionCookie.value
-    return sessionId.length > 0
-  } catch {
-    return false
-  }
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {

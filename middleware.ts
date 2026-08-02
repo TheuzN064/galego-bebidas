@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyAdminSession } from '@/lib/auth'
+import { verifyAdminSession, SESSION_COOKIE_NAME } from '@/lib/session'
 
-const SESSION_COOKIE_NAME = 'admin_session'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -10,30 +9,35 @@ export async function middleware(request: NextRequest) {
   // Temporarily disable admin protection for development without Redis
   // Protect admin routes
   if (pathname.startsWith('/admin') && pathname !== '/admin') {
-    const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)
+    const isValid = await verifyAdminSession(request)
     
-    if (!sessionCookie) {
+    if (!isValid) {
       const url = request.nextUrl.clone()
       url.pathname = '/admin'
       return NextResponse.redirect(url)
     }
   }
 
-  // Protect write API routes (exclude public endpoints like /api/coupons/validate)
+  // Protect write API routes (exclude public endpoints like /api/coupons/validate and /api/coupons/use)
+  const isPublicCouponEndpoint = 
+    pathname === '/api/coupons/validate' || 
+    pathname === '/api/coupons/use'
+
   const isProtectedApiWrite =
     pathname.startsWith('/api') &&
-    pathname !== '/api/coupons/validate' &&
+    !isPublicCouponEndpoint &&
     ((pathname.includes('/products') && ['POST', 'PUT', 'DELETE'].includes(request.method)) ||
      (pathname.includes('/categories') && ['POST', 'PUT', 'DELETE'].includes(request.method)) ||
      (pathname.includes('/coupons') && ['POST', 'PUT', 'DELETE'].includes(request.method)) ||
      (pathname.includes('/config') && request.method === 'PUT'))
 
   if (isProtectedApiWrite) {
-    const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)
-    if (!sessionCookie) {
+    const isValid = await verifyAdminSession(request)
+    if (!isValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
+
 
   return NextResponse.next()
 }

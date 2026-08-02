@@ -92,10 +92,15 @@ export function ShoppingCart({
                       className="flex gap-4 rounded-lg border border-dark-border bg-dark-bg p-3"
                     >
                       <img
-                        src={item.product.image}
+                        src={item.product.image || '/logo.png'}
                         alt={item.product.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null
+                          e.currentTarget.src = '/logo.png'
+                        }}
                         className="h-20 w-20 rounded-lg object-cover"
                       />
+
                       <div className="flex-1">
                         <h3 className="font-manrope font-medium text-dark-text">
                           {item.product.name}

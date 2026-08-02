@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { CartItem, Config, Order } from '@/types'
-import { formatCurrency, formatWhatsAppMessage } from '@/lib/utils'
+import { formatCurrency, formatWhatsAppMessage, getWhatsAppUrl } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { 
@@ -220,13 +220,24 @@ export function CheckoutModal({
     try {
       const finalConfig = config || await (await fetch('/api/config')).json()
 
+      const appliedCouponCode = appliedCoupon || (discount > 0 ? formData.couponCode.trim() : undefined)
+
+      // Register coupon usage if a valid coupon was applied
+      if (appliedCouponCode) {
+        fetch('/api/coupons/use', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: appliedCouponCode }),
+        }).catch(err => console.error('Error registering coupon use:', err))
+      }
+
       const order: Order = {
         items,
         subtotal,
         deliveryFee,
         deliveryType,
         discount,
-        couponCode: discount > 0 ? (appliedCoupon || formData.couponCode) : undefined,
+        couponCode: appliedCouponCode,
         total,
         customer: {
           name: formData.name.trim(),
@@ -246,8 +257,7 @@ export function CheckoutModal({
       }
 
       const message = formatWhatsAppMessage(order, finalConfig)
-      const whatsappNumber = (finalConfig.whatsapp || '').replace(/\D/g, '')
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+      const whatsappUrl = getWhatsAppUrl(finalConfig.whatsapp || '', message)
 
       window.open(whatsappUrl, '_blank')
       onClearCart()
@@ -508,6 +518,7 @@ export function CheckoutModal({
                     placeholder="(00) 00000-0000"
                     required
                     type="tel"
+                    inputMode="numeric"
                     value={formData.phone}
                     onChange={(e) => handlePhoneChange(e.target.value)}
                     className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
@@ -590,6 +601,7 @@ export function CheckoutModal({
                     <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                     <Input
                       placeholder="00000-000"
+                      inputMode="numeric"
                       value={formData.cep}
                       onChange={(e) => handleCepChange(e.target.value)}
                       className="pl-9 bg-zinc-900 border-zinc-800 text-sm focus-visible:ring-primary h-10"
@@ -754,6 +766,7 @@ export function CheckoutModal({
                     <label className="text-[11px] text-zinc-400 block mb-1">Troco para quanto?</label>
                     <Input
                       placeholder="Ex: 50,00 ou 100,00"
+                      inputMode="numeric"
                       value={formData.changeFor}
                       onChange={(e) => setFormData(prev => ({ ...prev, changeFor: e.target.value }))}
                       className="bg-zinc-950 border-zinc-800 text-sm focus-visible:ring-primary h-9"

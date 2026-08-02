@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
     }
 
-    const sessionId = createSessionCookie()
+    const sessionId = await createSessionCookie()
     setSessionCookie(sessionId)
+
 
     return NextResponse.json({ success: true })
   } catch (error) {
