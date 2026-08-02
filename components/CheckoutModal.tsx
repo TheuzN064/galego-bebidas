@@ -24,7 +24,8 @@ import {
   Bike,
   Store,
   Clock,
-  ExternalLink
+  ExternalLink,
+  AlertCircle
 } from 'lucide-react'
 
 interface CheckoutModalProps {
@@ -302,6 +303,18 @@ export function CheckoutModal({
 
         {/* Modal Form Scrollable Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-6 overflow-y-auto flex-1">
+          {/* Store Closed Warning Banner */}
+          {config?.isOpen === false && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 shadow-sm">
+              <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <strong className="block font-bold text-amber-200">A loja está fechada no momento</strong>
+                <p className="text-zinc-300">{config.closedMessage || 'Seu pedido será recebido e atendido assim que abrirmos!'}</p>
+                {config.hours && <p className="text-[11px] text-zinc-400">🕒 Horário: {config.hours}</p>}
+              </div>
+            </div>
+          )}
+
           {/* 1. Delivery Type Selection (Entrega vs Retirada) */}
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">

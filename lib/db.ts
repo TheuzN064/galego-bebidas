@@ -1,5 +1,5 @@
 import { getRedis } from './redis'
-import { Product, Category, Coupon, Config } from '@/types'
+import { Product, Category, Coupon, Config, ScheduleDay } from '@/types'
 
 // Redis key patterns
 const KEYS = {
@@ -141,19 +141,42 @@ export async function getConfig(): Promise<Config> {
   const redis = getRedis()
   const config = await redis.get<Config>(KEYS.config)
   
+  const defaultSchedules: ScheduleDay[] = [
+    { day: 'Segunda-feira', openTime: '09:00', closeTime: '22:00', closed: false },
+    { day: 'Terça-feira', openTime: '09:00', closeTime: '22:00', closed: false },
+    { day: 'Quarta-feira', openTime: '09:00', closeTime: '22:00', closed: false },
+    { day: 'Quinta-feira', openTime: '09:00', closeTime: '23:00', closed: false },
+    { day: 'Sexta-feira', openTime: '09:00', closeTime: '02:00', closed: false },
+    { day: 'Sábado', openTime: '09:00', closeTime: '02:00', closed: false },
+    { day: 'Domingo', openTime: '09:00', closeTime: '20:00', closed: false },
+  ]
+
   if (!config) {
     return {
       storeName: 'Galego — Depósito de Bebidas',
       whatsapp: '',
       address: '',
-      hours: '',
+      hours: 'Seg a Sex: 09h às 22h | Sáb e Dom: 09h às 02h',
       deliveryFee: 0,
       minOrderValue: 0,
       deliveryRadius: 0,
+      isOpen: true,
+      closedMessage: 'Estamos fechados no momento. Você ainda pode consultar nossos produtos e montar seu pedido!',
+      announcement: '',
+      announcementActive: false,
+      schedules: defaultSchedules,
     }
   }
-  
-  return config
+
+  // Ensure defaults for existing records
+  return {
+    ...config,
+    isOpen: config.isOpen !== undefined ? config.isOpen : true,
+    closedMessage: config.closedMessage || 'Estamos fechados no momento. Você ainda pode consultar nossos produtos e montar seu pedido!',
+    announcement: config.announcement || '',
+    announcementActive: config.announcementActive || false,
+    schedules: config.schedules && config.schedules.length > 0 ? config.schedules : defaultSchedules,
+  }
 }
 
 export async function updateConfig(config: Config): Promise<void> {

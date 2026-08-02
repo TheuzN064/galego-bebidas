@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Product, Category, Coupon, Config } from '@/types'
+import { Product, Category, Coupon, Config, ScheduleDay } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,10 +16,18 @@ import {
   Plus,
   Edit,
   Trash2,
-  Save
+  Save,
+  Clock,
+  Megaphone,
+  CheckCircle2,
+  AlertCircle,
+  Store,
+  Sparkles,
+  Calendar,
+  Power
 } from 'lucide-react'
 
-type Tab = 'overview' | 'products' | 'categories' | 'coupons' | 'config'
+type Tab = 'overview' | 'products' | 'categories' | 'coupons' | 'schedules' | 'config'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -29,6 +37,7 @@ export default function AdminDashboard() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [config, setConfig] = useState<Config | null>(null)
   const [loading, setLoading] = useState(true)
+  const [togglingStatus, setTogglingStatus] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -64,8 +73,35 @@ export default function AdminDashboard() {
     router.push('/admin')
   }
 
+  // Quick 1-click status toggle from the header
+  const handleQuickToggleStore = async () => {
+    if (!config || togglingStatus) return
+    setTogglingStatus(true)
+    const newStatus = config.isOpen === false ? true : false
+    const updatedConfig: Config = { ...config, isOpen: newStatus }
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedConfig),
+      })
+      if (res.ok) {
+        setConfig(updatedConfig)
+      } else {
+        alert('Erro ao atualizar status da loja.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Erro ao atualizar status.')
+    } finally {
+      setTogglingStatus(false)
+    }
+  }
+
   const tabs = [
     { id: 'overview' as Tab, label: 'Visão Geral', icon: LayoutDashboard },
+    { id: 'schedules' as Tab, label: 'Status & Horários', icon: Clock },
     { id: 'products' as Tab, label: 'Produtos', icon: Package },
     { id: 'categories' as Tab, label: 'Categorias', icon: Tags },
     { id: 'coupons' as Tab, label: 'Cupons', icon: Ticket },
@@ -74,18 +110,20 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-dark-bg">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent shadow-lime-glow" />
       </div>
     )
   }
+
+  const isStoreOpen = config?.isOpen !== false
 
   return (
     <div className="min-h-screen bg-dark-bg selection:bg-primary selection:text-black">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-dark-border bg-dark-card/90 backdrop-blur-md">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img 
                 src="/logo.png" 
@@ -99,12 +137,31 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            {/* Header Right Actions */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Live Store Status Switch */}
+              <button
+                onClick={handleQuickToggleStore}
+                disabled={togglingStatus}
+                title={isStoreOpen ? 'Clique para FECHAR a loja' : 'Clique para ABRIR a loja'}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border shadow-sm ${
+                  isStoreOpen
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                    : 'bg-rose-500/10 border-rose-500/40 text-rose-400 hover:bg-rose-500/20'
+                }`}
+              >
+                <span className={`h-2.5 w-2.5 rounded-full ${isStoreOpen ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                <span className="hidden sm:inline">{isStoreOpen ? 'Loja Aberta' : 'Loja Fechada'}</span>
+                <span className="sm:hidden">{isStoreOpen ? 'Aberta' : 'Fechada'}</span>
+                <span className="text-[10px] opacity-75 font-normal">({isStoreOpen ? 'Fechar' : 'Abrir'})</span>
+              </button>
+
               <a 
                 href="/" 
                 target="_blank" 
                 rel="noreferrer"
-                className="text-xs text-dark-muted hover:text-primary transition-colors px-3 py-2 rounded-lg border border-dark-border bg-dark-bg font-medium"
+                className="hidden md:inline-flex text-xs text-dark-muted hover:text-primary transition-colors px-3 py-2 rounded-lg border border-dark-border bg-dark-bg font-medium"
               >
                 Ver Catálogo ↗
               </a>
@@ -141,7 +198,8 @@ export default function AdminDashboard() {
 
           {/* Content */}
           <main className="flex-1">
-            {activeTab === 'overview' && <OverviewTab products={products} categories={categories} coupons={coupons} />}
+            {activeTab === 'overview' && <OverviewTab products={products} categories={categories} coupons={coupons} config={config} />}
+            {activeTab === 'schedules' && <SchedulesTab config={config} onUpdate={fetchData} />}
             {activeTab === 'products' && <ProductsTab products={products} categories={categories} onUpdate={fetchData} />}
             {activeTab === 'categories' && <CategoriesTab categories={categories} onUpdate={fetchData} />}
             {activeTab === 'coupons' && <CouponsTab coupons={coupons} onUpdate={fetchData} />}
@@ -153,10 +211,22 @@ export default function AdminDashboard() {
   )
 }
 
-function OverviewTab({ products, categories, coupons }: { products: Product[], categories: Category[], coupons: Coupon[] }) {
+function OverviewTab({ products, categories, coupons, config }: { products: Product[], categories: Category[], coupons: Coupon[], config: Config | null }) {
+  const isStoreOpen = config?.isOpen !== false
+
   return (
     <div className="space-y-6">
-      <h2 className="font-anton text-2xl text-dark-text">Visão Geral</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-anton text-2xl text-dark-text">Visão Geral</h2>
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${
+          isStoreOpen
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+        }`}>
+          <span className={`h-2 w-2 rounded-full ${isStoreOpen ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+          {isStoreOpen ? '🟢 Loja Aberta (Recebendo Pedidos)' : '🔴 Loja Fechada (Pausada)'}
+        </div>
+      </div>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -211,12 +281,399 @@ function OverviewTab({ products, categories, coupons }: { products: Product[], c
   )
 }
 
+/* =========================================================================
+   STATUS, AVISOS E HORÁRIOS DA LOJA (SchedulesTab)
+========================================================================= */
+function SchedulesTab({ config, onUpdate }: { config: Config | null, onUpdate: () => void }) {
+  const defaultSchedules: ScheduleDay[] = [
+    { day: 'Segunda-feira', openTime: '09:00', closeTime: '22:00', closed: false },
+    { day: 'Terça-feira', openTime: '09:00', closeTime: '22:00', closed: false },
+    { day: 'Quarta-feira', openTime: '09:00', closeTime: '22:00', closed: false },
+    { day: 'Quinta-feira', openTime: '09:00', closeTime: '23:00', closed: false },
+    { day: 'Sexta-feira', openTime: '09:00', closeTime: '02:00', closed: false },
+    { day: 'Sábado', openTime: '09:00', closeTime: '02:00', closed: false },
+    { day: 'Domingo', openTime: '09:00', closeTime: '20:00', closed: false },
+  ]
+
+  const [formData, setFormData] = useState<Config>(config || {
+    storeName: 'Galego — Depósito de Bebidas',
+    whatsapp: '',
+    address: '',
+    hours: 'Seg a Sex: 09h às 22h | Sáb e Dom: 09h às 02h',
+    deliveryFee: 0,
+    minOrderValue: 0,
+    deliveryRadius: 0,
+    isOpen: true,
+    closedMessage: 'Estamos fechados no momento. Você ainda pode consultar nossos produtos e montar seu pedido!',
+    announcement: '',
+    announcementActive: false,
+    schedules: defaultSchedules,
+  })
+
+  const [saving, setSaving] = useState(false)
+  const [savedSuccess, setSavedSuccess] = useState(false)
+
+  useEffect(() => {
+    if (config) {
+      setFormData({
+        ...config,
+        isOpen: config.isOpen !== undefined ? config.isOpen : true,
+        closedMessage: config.closedMessage || 'Estamos fechados no momento. Você ainda pode consultar nossos produtos e montar seu pedido!',
+        announcement: config.announcement || '',
+        announcementActive: config.announcementActive || false,
+        schedules: config.schedules && config.schedules.length > 0 ? config.schedules : defaultSchedules,
+      })
+    }
+  }, [config])
+
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setSaving(true)
+    setSavedSuccess(false)
+    try {
+      const res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) throw new Error('Erro ao salvar')
+      setSavedSuccess(true)
+      onUpdate()
+      setTimeout(() => setSavedSuccess(false), 4000)
+    } catch {
+      alert('Erro ao salvar as configurações. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleScheduleChange = (index: number, field: keyof ScheduleDay, value: any) => {
+    const updated = [...(formData.schedules || defaultSchedules)]
+    updated[index] = { ...updated[index], [field]: value }
+    setFormData({ ...formData, schedules: updated })
+  }
+
+  // Auto generate readable hours text from schedules
+  const handleAutoGenerateHoursText = () => {
+    const list = formData.schedules || defaultSchedules
+    const parts: string[] = []
+
+    // Grouping helper
+    const activeDays = list.filter(d => !d.closed)
+    if (activeDays.length === 0) {
+      setFormData({ ...formData, hours: 'Fechado temporariamente' })
+      return
+    }
+
+    // Check if Mon-Thu are same, Fri-Sat same, Sun distinct
+    const mon = list.find(d => d.day.startsWith('Segunda'))
+    const fri = list.find(d => d.day.startsWith('Sexta'))
+    const sat = list.find(d => d.day.startsWith('Sábado'))
+    const sun = list.find(d => d.day.startsWith('Domingo'))
+
+    if (mon && !mon.closed) {
+      parts.push(`Seg a Qui: ${mon.openTime.replace(':00', 'h')} às ${mon.closeTime.replace(':00', 'h')}`)
+    }
+    if (fri && !fri.closed) {
+      parts.push(`Sex e Sáb: ${fri.openTime.replace(':00', 'h')} às ${fri.closeTime.replace(':00', 'h')}`)
+    }
+    if (sun && !sun.closed) {
+      parts.push(`Dom: ${sun.openTime.replace(':00', 'h')} às ${sun.closeTime.replace(':00', 'h')}`)
+    } else if (sun && sun.closed) {
+      parts.push('Dom: Fechado')
+    }
+
+    const generated = parts.join(' | ')
+    setFormData({ ...formData, hours: generated || 'Consulte nosso horário' })
+  }
+
+  const presetMessages = [
+    'Estamos fechados no momento. Retornaremos às 18:00 com atendimento normal!',
+    'Fechado para reposição de estoque. Voltamos em aproximadamente 30 minutos!',
+    'Hoje não abriremos devido a feriado. Retornaremos amanhã com muitas bebidas geladas!',
+    'Estamos fechados no momento. Mas você já pode ir montando seu carrinho para mais tarde!',
+  ]
+
+  const isStoreOpen = formData.isOpen !== false
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 className="font-anton text-2xl text-dark-text">Status & Horários de Atendimento</h2>
+          <p className="text-sm text-dark-muted">Abra ou feche a loja, defina mensagens de aviso e configure os horários</p>
+        </div>
+        {savedSuccess && (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium animate-fadeIn">
+            ✓ Salvo com sucesso!
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* 1. STATUS PRINCIPAL DA LOJA */}
+        <Card className="border border-dark-border bg-dark-card/60 overflow-hidden">
+          <CardContent className="p-6 space-y-5">
+            <div className="border-b border-dark-border/60 pb-3">
+              <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                <Power className="h-5 w-5 text-primary" />
+                <span>Status da Loja (Aberto / Fechado)</span>
+              </h3>
+              <p className="text-xs text-dark-muted mt-0.5">Controle instantâneo para aceitar ou pausar novos pedidos no site</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Botão ABERTO */}
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isOpen: true })}
+                className={`relative flex flex-col items-center text-center p-5 rounded-2xl border transition-all duration-200 ${
+                  isStoreOpen
+                    ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/40 text-white shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                    : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                }`}
+              >
+                <div className={`p-3 rounded-full mb-2 ${isStoreOpen ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}>
+                  <Store className="h-6 w-6" />
+                </div>
+                <span className="font-anton text-base tracking-wide">🟢 LOJA ABERTA</span>
+                <span className="text-xs text-emerald-400 font-semibold mt-1">
+                  Recebendo pedidos normalmente
+                </span>
+                <span className="text-[11px] text-zinc-400 mt-1">
+                  Exibe o badge "ABERTO E ENTREGANDO AGORA" no topo do catálogo.
+                </span>
+                {isStoreOpen && (
+                  <div className="absolute top-3 right-3 h-3 w-3 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+              </button>
+
+              {/* Botão FECHADO */}
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, isOpen: false })}
+                className={`relative flex flex-col items-center text-center p-5 rounded-2xl border transition-all duration-200 ${
+                  !isStoreOpen
+                    ? 'border-rose-500 bg-rose-500/10 ring-2 ring-rose-500/40 text-white shadow-[0_0_20px_rgba(244,63,94,0.15)]'
+                    : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                }`}
+              >
+                <div className={`p-3 rounded-full mb-2 ${!isStoreOpen ? 'bg-rose-500 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                  <Power className="h-6 w-6" />
+                </div>
+                <span className="font-anton text-base tracking-wide">🔴 LOJA FECHADA</span>
+                <span className="text-xs text-rose-400 font-semibold mt-1">
+                  Pausada para novos pedidos
+                </span>
+                <span className="text-[11px] text-zinc-400 mt-1">
+                  Exibe badge "FECHADO" e o banner com o horário de reabertura.
+                </span>
+                {!isStoreOpen && (
+                  <div className="absolute top-3 right-3 h-3 w-3 rounded-full bg-rose-400 animate-pulse" />
+                )}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2. MENSAGEM DE LOJA FECHADA */}
+        <Card className="border border-dark-border bg-dark-card/60">
+          <CardContent className="p-6 space-y-4">
+            <div className="border-b border-dark-border/60 pb-3">
+              <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-400" />
+                <span>Mensagem de Aviso (Quando a Loja Estiver Fechada)</span>
+              </h3>
+              <p className="text-xs text-dark-muted mt-0.5">Esse texto será exibido em um banner elegante no topo do catálogo quando a loja estiver fechada</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                Texto do Aviso de Loja Fechada
+              </label>
+              <textarea
+                rows={3}
+                value={formData.closedMessage || ''}
+                onChange={(e) => setFormData({ ...formData, closedMessage: e.target.value })}
+                placeholder="Ex: Estamos fechados no momento. Retornaremos às 18:00 com atendimento normal!"
+                className="w-full rounded-xl border border-dark-border bg-zinc-900 p-3 text-sm text-dark-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+              />
+              
+              {/* Sugestões rápidas de mensagens */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Sugestões rápidas:</span>
+                <div className="flex flex-wrap gap-2">
+                  {presetMessages.map((msg, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, closedMessage: msg })}
+                      className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-zinc-800 transition-colors text-left"
+                    >
+                      💬 {msg.slice(0, 45)}...
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. ANÚNCIO PROMOCIONAL ESPECIAL (BANNER NO TOPO DO SITE) */}
+        <Card className="border border-dark-border bg-dark-card/60">
+          <CardContent className="p-6 space-y-4">
+            <div className="border-b border-dark-border/60 pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                  <Megaphone className="h-5 w-5 text-primary" />
+                  <span>Banner de Anúncio Promocional (Topo do Site)</span>
+                </h3>
+                <p className="text-xs text-dark-muted mt-0.5">Destaque uma promoção, aviso de feriado ou recado especial para todos os visitantes</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.announcementActive || false}
+                  onChange={(e) => setFormData({ ...formData, announcementActive: e.target.checked })}
+                  className="rounded border-zinc-700 text-primary focus:ring-primary bg-zinc-800 h-4 w-4"
+                />
+                <span className="text-xs text-primary font-bold">Ativar Banner</span>
+              </label>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                  Texto do Anúncio
+                </label>
+                <Input
+                  placeholder="Ex: 🔥 SUPER PROMOÇÃO: Heiniken Long Neck com 15% OFF até as 21h!"
+                  value={formData.announcement || ''}
+                  onChange={(e) => setFormData({ ...formData, announcement: e.target.value })}
+                />
+              </div>
+
+              {formData.announcementActive && formData.announcement && (
+                <div className="p-3 rounded-xl bg-primary/10 border border-primary/40 text-white flex items-center gap-2 shadow-lime-glow-sm animate-fadeIn">
+                  <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="text-xs font-semibold">
+                    <strong>Prévia:</strong> {formData.announcement}
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 4. HORÁRIOS DE FUNCIONAMENTO (DETALHADOS & RESUMO) */}
+        <Card className="border border-dark-border bg-dark-card/60">
+          <CardContent className="p-6 space-y-4">
+            <div className="border-b border-dark-border/60 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h3 className="text-base font-semibold text-dark-text flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <span>Horários por Dia da Semana</span>
+                </h3>
+                <p className="text-xs text-dark-muted mt-0.5">Defina os horários de abertura e fechamento de cada dia</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAutoGenerateHoursText}
+                className="text-xs border-primary/50 text-primary hover:bg-primary hover:text-black"
+              >
+                ⚡ Gerar Resumo em Texto
+              </Button>
+            </div>
+
+            {/* Tabela de Dias */}
+            <div className="space-y-2.5">
+              {(formData.schedules || defaultSchedules).map((item, idx) => (
+                <div 
+                  key={item.day}
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${
+                    item.closed 
+                      ? 'bg-zinc-900/40 border-zinc-800/60 opacity-60' 
+                      : 'bg-zinc-900 border-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 w-40">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!item.closed}
+                        onChange={(e) => handleScheduleChange(idx, 'closed', !e.target.checked)}
+                        className="rounded border-zinc-700 text-primary focus:ring-primary bg-zinc-800 h-4 w-4"
+                      />
+                      <span className={`text-xs font-bold ${item.closed ? 'text-zinc-500 line-through' : 'text-white'}`}>
+                        {item.day}
+                      </span>
+                    </label>
+                  </div>
+
+                  {!item.closed ? (
+                    <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                      <span className="text-xs text-zinc-400">Abre:</span>
+                      <Input
+                        type="time"
+                        value={item.openTime}
+                        onChange={(e) => handleScheduleChange(idx, 'openTime', e.target.value)}
+                        className="w-28 h-8 text-xs bg-zinc-950 border-zinc-700"
+                      />
+                      <span className="text-xs text-zinc-400 ml-2">Fecha:</span>
+                      <Input
+                        type="time"
+                        value={item.closeTime}
+                        onChange={(e) => handleScheduleChange(idx, 'closeTime', e.target.value)}
+                        className="w-28 h-8 text-xs bg-zinc-950 border-zinc-700"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-xs text-rose-400 font-semibold mt-2 sm:mt-0">Fechado o dia todo</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Campo de Texto Resumo */}
+            <div className="space-y-1.5 pt-3 border-t border-dark-border/60">
+              <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
+                Texto de Resumo dos Horários (Exibido no Cabeçalho e Rodapé) *
+              </label>
+              <Input
+                placeholder="Ex: Seg a Sex: 09h às 22h | Sáb e Dom: 09h às 02h"
+                value={formData.hours}
+                onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
+                required
+              />
+              <p className="text-xs text-dark-muted">Esse texto resumido aparece nos cards informativos do catálogo e no rodapé.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Botão de Salvar Alterações */}
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="submit" disabled={saving} className="px-8 h-11 text-sm font-bold">
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? 'Salvando...' : 'Salvar Alterações de Status & Horários'}
+          </Button>
+          {savedSuccess && (
+            <span className="text-sm text-green-400 font-medium animate-fadeIn">
+              Alterações aplicadas com sucesso!
+            </span>
+          )}
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function ProductsTab({ products, categories, onUpdate }: { products: Product[], categories: Category[], onUpdate: () => void }) {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   const handleSave = async (product: Product) => {
     const isNew = !editingProduct?.id
-    // Auto-generate ID from name if creating a new product
     if (isNew && !product.id) {
       product.id = product.name
         .toLowerCase()
@@ -405,7 +862,6 @@ function CategoriesTab({ categories, onUpdate }: { categories: Category[], onUpd
 
   const handleSave = async (category: Category) => {
     const isNew = !editingCategory?.id
-    // Auto-generate ID from name if creating a new category
     if (isNew && !category.id) {
       category.id = category.name
         .toLowerCase()
@@ -456,7 +912,7 @@ function CategoriesTab({ categories, onUpdate }: { categories: Category[], onUpd
         </Card>
       )}
 
-      <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {categories.map((category) => (
           <Card key={category.id}>
             <CardContent className="flex items-center gap-4 p-4">
@@ -486,11 +942,11 @@ function CategoryForm({ category, onSave, onCancel }: { category: Category, onSa
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData) }} className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-2 space-y-1">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Nome da Categoria *</label>
           <Input
-            placeholder="Ex: Cervejas, Vinhos, Destilados"
+            placeholder="Ex: Cervejas"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
@@ -499,7 +955,7 @@ function CategoryForm({ category, onSave, onCancel }: { category: Category, onSa
         <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Ícone (Emoji) *</label>
           <Input
-            placeholder="Ex: 🍺 🍷 🥃"
+            placeholder="Ex: 🍺"
             value={formData.icon}
             onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
             required
@@ -507,11 +963,12 @@ function CategoryForm({ category, onSave, onCancel }: { category: Category, onSa
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Descrição</label>
+        <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Descrição *</label>
         <Input
-          placeholder="Ex: Cervejas nacionais e importadas geladas"
+          placeholder="Ex: Cervejas nacionais e importadas bem geladas"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          required
         />
       </div>
       <div className="flex gap-2 pt-2">
@@ -529,37 +986,28 @@ function CategoryForm({ category, onSave, onCancel }: { category: Category, onSa
 
 function CouponsTab({ coupons, onUpdate }: { coupons: Coupon[], onUpdate: () => void }) {
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null)
-  const [saving, setSaving] = useState(false)
 
   const handleSave = async (coupon: Coupon) => {
-    setSaving(true)
-    try {
-      const isNew = !editingCoupon?.id
-      if (isNew && !coupon.id) {
-        coupon.id = coupon.code.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `coupon-${Date.now()}`
-      }
-      const url = isNew ? '/api/coupons' : `/api/coupons/${coupon.id}`
-      const method = isNew ? 'POST' : 'PUT'
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(coupon),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        alert(data.error || 'Erro ao salvar cupom. Verifique os campos.')
-        return
-      }
-
-      setEditingCoupon(null)
-      onUpdate()
-    } catch {
-      alert('Erro de conexão ao salvar cupom.')
-    } finally {
-      setSaving(false)
+    const isNew = !editingCoupon?.id
+    if (isNew && !coupon.id) {
+      coupon.id = coupon.code.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now()
     }
+    const url = isNew ? '/api/coupons' : `/api/coupons/${coupon.id}`
+    const method = isNew ? 'POST' : 'PUT'
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(coupon),
+    })
+
+    if (!res.ok) {
+      alert('Erro ao salvar cupom. Verifique os campos.')
+      return
+    }
+
+    setEditingCoupon(null)
+    onUpdate()
   }
 
   const handleDelete = async (id: string) => {
@@ -572,19 +1020,17 @@ function CouponsTab({ coupons, onUpdate }: { coupons: Coupon[], onUpdate: () => 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-anton text-2xl text-dark-text">Cupons de Desconto</h2>
-          <p className="text-sm text-dark-muted">Crie e gerencie códigos promocionais para seus clientes</p>
-        </div>
-        <Button onClick={() => setEditingCoupon({
-          id: '',
-          code: '',
-          discountType: 'percentage',
-          discountValue: 10,
-          minPurchase: 0,
-          usedCount: 0,
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          active: true
+        <h2 className="font-anton text-2xl text-dark-text">Cupons de Desconto</h2>
+        <Button onClick={() => setEditingCoupon({ 
+          id: '', 
+          code: '', 
+          discountType: 'percentage', 
+          discountValue: 10, 
+          minPurchase: 0, 
+          maxUses: 100, 
+          usedCount: 0, 
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          active: true 
         } as Coupon)}>
           <Plus className="h-4 w-4 mr-2" />
           Novo Cupom
@@ -592,201 +1038,147 @@ function CouponsTab({ coupons, onUpdate }: { coupons: Coupon[], onUpdate: () => 
       </div>
 
       {editingCoupon && (
-        <Card className="border border-dark-border bg-dark-card/60">
+        <Card>
           <CardContent className="p-6">
-            <h3 className="font-semibold text-lg text-dark-text mb-4">
-              {editingCoupon.id ? 'Editar Cupom' : 'Criar Novo Cupom'}
-            </h3>
-            <CouponForm coupon={editingCoupon} onSave={handleSave} onCancel={() => setEditingCoupon(null)} saving={saving} />
+            <CouponForm coupon={editingCoupon} onSave={handleSave} onCancel={() => setEditingCoupon(null)} />
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {coupons.map((coupon) => {
-          const isExpired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()
-          return (
-            <Card key={coupon.id} className="border border-dark-border bg-dark-card/60">
-              <CardContent className="flex items-center justify-between gap-4 p-5">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-lg text-primary tracking-wide">{coupon.code}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      coupon.active && !isExpired
-                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                    }`}>
-                      {!coupon.active ? 'Inativo' : isExpired ? 'Expirado' : 'Ativo'}
-                    </span>
-                  </div>
-                  <p className="text-sm font-semibold text-dark-text">
-                    {coupon.discountType === 'percentage' ? `${coupon.discountValue}% OFF` : `R$ ${coupon.discountValue.toFixed(2)} de desconto`}
-                  </p>
-                  <p className="text-xs text-dark-muted">
-                    Mínimo: {coupon.minPurchase > 0 ? `R$ ${coupon.minPurchase.toFixed(2)}` : 'Sem mínimo'} • Usos: {coupon.usedCount || 0}{coupon.maxUses ? ` / ${coupon.maxUses}` : ''}
-                  </p>
-                  {coupon.expiresAt && (
-                    <p className="text-xs text-dark-muted">
-                      Válido até: {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setEditingCoupon(coupon)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(coupon.id)}>
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {coupons.map((coupon) => (
+          <Card key={coupon.id} className={!coupon.active ? 'opacity-60' : ''}>
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-lg text-primary bg-primary/10 px-2.5 py-1 rounded border border-primary/30">
+                  {coupon.code}
+                </span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${coupon.active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                  {coupon.active ? 'Ativo' : 'Inativo'}
+                </span>
+              </div>
+              <div className="text-sm text-dark-muted space-y-1">
+                <p>
+                  Desconto: <strong className="text-white">
+                    {coupon.discountType === 'percentage' ? `${coupon.discountValue}%` : `R$ ${coupon.discountValue.toFixed(2)}`}
+                  </strong>
+                </p>
+                {coupon.minPurchase > 0 && (
+                  <p>Mínimo: <span className="text-white">R$ {coupon.minPurchase.toFixed(2)}</span></p>
+                )}
+                <p>Usos: <span className="text-white">{coupon.usedCount || 0} {coupon.maxUses ? `/ ${coupon.maxUses}` : ''}</span></p>
+                {coupon.expiresAt && (
+                  <p>Validade: <span className="text-white">{new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}</span></p>
+                )}
+              </div>
+              <div className="flex gap-2 pt-2 border-t border-dark-border">
+                <Button variant="outline" size="sm" onClick={() => setEditingCoupon(coupon)}>
+                  <Edit className="h-4 w-4 mr-1" /> Editar
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDelete(coupon.id)} className="text-red-400 hover:text-red-300">
+                  <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   )
 }
 
-function CouponForm({
-  coupon,
-  onSave,
-  onCancel,
-  saving = false
-}: {
-  coupon: Coupon
-  onSave: (coupon: Coupon) => void
-  onCancel: () => void
-  saving?: boolean
-}) {
-  const [formData, setFormData] = useState<Coupon>(() => ({
-    ...coupon,
-    expiresAt: coupon.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-  }))
-  const noSpinner = '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
-
-  const dateValue = formData.expiresAt
-    ? formData.expiresAt.split('T')[0]
-    : new Date().toISOString().split('T')[0]
+function CouponForm({ coupon, onSave, onCancel }: { coupon: Coupon, onSave: (coupon: Coupon) => void, onCancel: () => void }) {
+  const [formData, setFormData] = useState(coupon)
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSave(formData) }} className="space-y-5">
-      {/* Código e Tipo */}
+    <form onSubmit={(e) => { e.preventDefault(); onSave(formData) }} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Código do Cupom *</label>
           <Input
-            placeholder="Ex: PROMO10, FRETEGRATIS, NATAL50"
+            placeholder="Ex: PRIMEIRA10"
             value={formData.code}
             onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s+/g, '') })}
             required
           />
-          <p className="text-xs text-dark-muted">Código que o cliente digitará no carrinho</p>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Tipo de Desconto *</label>
           <select
             className="flex h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-dark-text focus:outline-none focus:ring-2 focus:ring-primary"
             value={formData.discountType}
             onChange={(e) => setFormData({ ...formData, discountType: e.target.value as 'percentage' | 'fixed' })}
+            required
           >
-            <option value="percentage">Porcentagem (%) — Ex: 10% de desconto</option>
-            <option value="fixed">Valor Fixo (R$) — Ex: R$ 5,00 de desconto</option>
+            <option value="percentage">Porcentagem (%)</option>
+            <option value="fixed">Valor Fixo (R$)</option>
           </select>
-          <p className="text-xs text-dark-muted">Escolha se o desconto é percentual ou em reais</p>
         </div>
       </div>
-
-      {/* Valores */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
-            {formData.discountType === 'percentage' ? 'Valor do Desconto (%) *' : 'Valor do Desconto (R$) *'}
+            {formData.discountType === 'percentage' ? 'Desconto (%) *' : 'Desconto (R$) *'}
           </label>
           <Input
             type="number"
-            step={formData.discountType === 'percentage' ? '1' : '0.01'}
-            min="0.01"
-            max={formData.discountType === 'percentage' ? '100' : undefined}
-            placeholder={formData.discountType === 'percentage' ? 'Ex: 10' : 'Ex: 5.00'}
+            step="0.01"
+            min="0"
+            placeholder="Ex: 10"
             value={formData.discountValue || ''}
             onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
-            className={noSpinner}
             required
           />
-          <p className="text-xs text-dark-muted">
-            {formData.discountType === 'percentage' ? 'Entre 1% e 100%' : 'Valor em reais'}
-          </p>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Compra Mínima (R$)</label>
           <Input
             type="number"
             step="0.01"
             min="0"
-            placeholder="Ex: 30.00"
+            placeholder="Ex: 50.00"
             value={formData.minPurchase || ''}
             onChange={(e) => setFormData({ ...formData, minPurchase: parseFloat(e.target.value) || 0 })}
-            className={noSpinner}
           />
-          <p className="text-xs text-dark-muted">0 ou vazio = sem valor mínimo</p>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Limite de Usos</label>
           <Input
             type="number"
             min="1"
             placeholder="Ex: 100"
             value={formData.maxUses || ''}
-            onChange={(e) => setFormData({ ...formData, maxUses: e.target.value ? parseInt(e.target.value) : undefined })}
-            className={noSpinner}
+            onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || undefined })}
           />
-          <p className="text-xs text-dark-muted">Vazio = uso ilimitado</p>
         </div>
       </div>
-
-      {/* Data e Status */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Data de Expiração *</label>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Data de Expiração</label>
           <Input
             type="date"
-            value={dateValue}
-            onChange={(e) => {
-              if (e.target.value) {
-                setFormData({ ...formData, expiresAt: `${e.target.value}T23:59:59.999Z` })
-              }
-            }}
-            min={new Date().toISOString().split('T')[0]}
-            required
+            value={formData.expiresAt ? formData.expiresAt.split('T')[0] : ''}
+            onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
           />
-          <p className="text-xs text-dark-muted">Válido até às 23:59 da data selecionada</p>
         </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">Status do Cupom</label>
-          <div className="flex h-10 items-center">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.active}
-                onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                className="h-4 w-4 accent-primary"
-              />
-              <span className="text-sm text-dark-text font-medium">
-                {formData.active ? '✅ Cupom Ativo' : '❌ Cupom Desativado'}
-              </span>
-            </label>
-          </div>
-          <p className="text-xs text-dark-muted">Desative para pausar o cupom temporariamente</p>
+        <div className="flex items-center gap-2 pt-6">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.active}
+              onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+              className="accent-primary h-4 w-4"
+            />
+            <span className="text-sm text-dark-text font-medium">Cupom Ativo</span>
+          </label>
         </div>
       </div>
-
       <div className="flex items-center gap-2 pt-2 border-t border-dark-border">
-        <Button type="submit" disabled={saving}>
+        <Button type="submit">
           <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Salvando...' : 'Salvar Cupom'}
+          Salvar Cupom
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
       </div>
@@ -840,7 +1232,7 @@ function ConfigTab({ config, onUpdate }: { config: Config | null, onUpdate: () =
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="font-anton text-2xl text-dark-text">Configurações da Loja</h2>
+          <h2 className="font-anton text-2xl text-dark-text">Configurações Gerais da Loja</h2>
           <p className="text-sm text-dark-muted">Personalize as informações públicas, atendimento e regras de entrega</p>
         </div>
         {savedSuccess && (
@@ -913,21 +1305,21 @@ function ConfigTab({ config, onUpdate }: { config: Config | null, onUpdate: () =
                   required
                 />
                 <p className="text-xs text-dark-muted">
-                  Código do país (55) + DDD + Número. Ex: <span className="text-primary font-mono">5511987654321</span>
+                  Código do país (55) + DDD + Número. Ex: <span className="text-primary font-mono">5583987654321</span>
                 </p>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-dark-muted uppercase tracking-wider">
-                  Horário de Funcionamento *
+                  Resumo de Horário *
                 </label>
                 <Input
-                  placeholder="Ex: Seg a Sex: 09h às 22h | Sáb e Dom: 09h às 00h"
+                  placeholder="Ex: Seg a Sex: 09h às 22h | Sáb e Dom: 09h às 02h"
                   value={formData.hours}
                   onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                   required
                 />
-                <p className="text-xs text-dark-muted">Informado aos clientes no cabeçalho e rodapé</p>
+                <p className="text-xs text-dark-muted">Para editar por dia da semana, use a aba "Status & Horários"</p>
               </div>
             </div>
           </CardContent>
@@ -1014,4 +1406,3 @@ function ConfigTab({ config, onUpdate }: { config: Config | null, onUpdate: () =
     </div>
   )
 }
-

@@ -33,6 +33,13 @@ export interface Coupon {
   active: boolean
 }
 
+export interface ScheduleDay {
+  day: string
+  openTime: string
+  closeTime: string
+  closed: boolean
+}
+
 export interface Config {
   storeName: string
   whatsapp: string
@@ -42,6 +49,11 @@ export interface Config {
   minOrderValue: number
   deliveryRadius: number
   adminPasswordHash?: string
+  isOpen?: boolean
+  closedMessage?: string
+  announcement?: string
+  announcementActive?: boolean
+  schedules?: ScheduleDay[]
 }
 
 export interface CartItem {

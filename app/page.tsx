@@ -12,7 +12,6 @@ import {
   Search, 
   Share2, 
   QrCode, 
-  Zap, 
   Clock, 
   Truck, 
   DollarSign, 
@@ -22,7 +21,10 @@ import {
   MapPin,
   Lock,
   CheckCircle2,
-  X
+  X,
+  Megaphone,
+  Moon,
+  MessageCircle
 } from 'lucide-react'
 
 export default function Home() {
@@ -35,6 +37,7 @@ export default function Home() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ id: number; message: string; product: Product } | null>(null)
+  const [dismissedAnnouncement, setDismissedAnnouncement] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -88,6 +91,8 @@ export default function Home() {
   const featuredProducts = (products || []).filter((p) => p.featured && p.available)
   const bestsellerProducts = (products || []).filter((p) => p.bestseller && p.available)
 
+  const isStoreOpen = config?.isOpen !== false
+
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.product.id === product.id)
@@ -130,7 +135,7 @@ export default function Home() {
   const handleShare = async () => {
     if (navigator.share) {
       await navigator.share({
-        title: 'Galego — Depósito de Bebidas',
+        title: config?.storeName || 'Galego — Depósito de Bebidas',
         text: 'Peça bebidas geladas com entrega rápida no Galego!',
         url: window.location.href,
       })
@@ -169,6 +174,26 @@ export default function Home() {
     <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-primary selection:text-black">
       {/* Top Ambient Light Effect */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-48 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent blur-2xl -z-10" />
+
+      {/* 1. TOP PROMOTIONAL ANNOUNCEMENT BAR (Se ativo) */}
+      {config?.announcementActive && config?.announcement && !dismissedAnnouncement && (
+        <div className="bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 border-b border-primary/40 px-4 py-2 text-white text-xs font-semibold backdrop-blur-md relative z-40 animate-fadeIn">
+          <div className="container mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1 justify-center text-center">
+              <Megaphone className="h-4 w-4 text-primary flex-shrink-0 animate-bounce" />
+              <span className="text-primary-light font-bold">AVISO:</span>
+              <span className="text-zinc-100">{config.announcement}</span>
+            </div>
+            <button
+              onClick={() => setDismissedAnnouncement(true)}
+              className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-black/20 transition-colors flex-shrink-0"
+              title="Fechar aviso"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-dark-border bg-dark-bg/90 backdrop-blur-md">
@@ -237,10 +262,19 @@ export default function Home() {
 
             {/* Hero Text */}
             <div className="flex-1 space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-bold tracking-wide">
-                <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                ABERTO E ENTREGANDO AGORA
-              </div>
+              {/* Dynamic Status Badge */}
+              {isStoreOpen ? (
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-bold tracking-wide shadow-lime-glow-sm">
+                  <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
+                  ABERTO E ENTREGANDO AGORA
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold tracking-wide">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse" />
+                  FECHADO NO MOMENTO
+                </div>
+              )}
+
               <h2 className="font-anton text-3xl sm:text-4xl text-white tracking-wide">
                 BEBIDAS GELADAS NA SUA PORTA
               </h2>
@@ -269,6 +303,55 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* 2. STORE CLOSED ANNOUNCEMENT CARD (Aparece quando a loja estiver fechada) */}
+      {!isStoreOpen && (
+        <section className="container mx-auto max-w-4xl px-4 pt-6">
+          <div className="rounded-2xl border border-rose-500/40 bg-gradient-to-br from-rose-950/30 via-zinc-900 to-zinc-950 p-5 sm:p-6 shadow-[0_0_30px_rgba(244,63,94,0.15)] relative overflow-hidden animate-fadeIn">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+            
+            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+              <div className="p-3.5 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex-shrink-0">
+                <Moon className="h-8 w-8" />
+              </div>
+
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                  <h3 className="font-anton text-lg sm:text-xl text-rose-400 tracking-wide">
+                    ESTAMOS FECHADOS NO MOMENTO
+                  </h3>
+                </div>
+                
+                <p className="text-sm text-zinc-200 font-medium leading-relaxed">
+                  {config?.closedMessage || 'Estamos fechados no momento. Você ainda pode consultar nossos produtos e montar seu carrinho para o próximo atendimento!'}
+                </p>
+
+                {config?.hours && (
+                  <div className="pt-2 flex items-center gap-2 text-xs text-zinc-400">
+                    <Clock className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                    <span><strong>Horário de Atendimento:</strong> {config.hours}</span>
+                  </div>
+                )}
+              </div>
+
+              {config?.whatsapp && (
+                <div className="sm:self-center flex-shrink-0 w-full sm:w-auto pt-2 sm:pt-0">
+                  <a
+                    href={`https://wa.me/${config.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Vi o catálogo e gostaria de tirar uma dúvida.')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold border border-zinc-700 transition-all hover:text-white"
+                  >
+                    <MessageCircle className="h-4 w-4 text-emerald-400" />
+                    Dúvidas no WhatsApp
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Search Bar */}
